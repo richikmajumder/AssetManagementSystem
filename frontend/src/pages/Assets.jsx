@@ -156,7 +156,7 @@ const Assets = () => {
       await assetsAPI.create(formData);
       toast.success('Asset created successfully');
       setIsAddOpen(false);
-      setFormData({ asset_type: '', name: '', description: '', is_shared: false, is_returnable: false, assigned_user_ids: [] });
+      setFormData({ asset_type: '', name: '', description: '', custom_asset_id: '', is_shared: false, is_returnable: false, assigned_user_ids: [], status: 'unassigned' });
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to create asset');
@@ -173,15 +173,41 @@ const Assets = () => {
       await assetsAPI.update(selectedAsset.id, {
         name: formData.name,
         description: formData.description,
+        custom_asset_id: formData.custom_asset_id,
         is_shared: formData.is_shared,
         is_returnable: formData.is_returnable,
         status: formData.status,
+        assigned_user_ids: formData.assigned_user_ids,
       });
       toast.success('Asset updated successfully');
       setIsEditOpen(false);
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to update asset');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBulkAssign = async (action) => {
+    if (!bulkAssignData.asset_id || bulkAssignData.user_ids.length === 0) {
+      toast.error('Please select asset and users');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await assetsAPI.bulkAssign({
+        asset_id: bulkAssignData.asset_id,
+        user_ids: bulkAssignData.user_ids,
+        action: action,
+      });
+      toast.success(`Users ${action}ed successfully`);
+      setIsBulkAssignOpen(false);
+      setBulkAssignData({ asset_id: '', user_ids: [] });
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to update assignment');
     } finally {
       setIsSubmitting(false);
     }
