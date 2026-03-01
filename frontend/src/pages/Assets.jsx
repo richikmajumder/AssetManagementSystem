@@ -555,7 +555,7 @@ const Assets = () => {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Asset</DialogTitle>
             <DialogDescription>Update asset details</DialogDescription>
@@ -567,6 +567,15 @@ const Assets = () => {
                 value={formData.name} 
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                 data-testid="edit-name-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Custom Asset ID (XYZ/ABCD/EF format)</Label>
+              <Input 
+                value={formData.custom_asset_id} 
+                onChange={(e) => setFormData({...formData, custom_asset_id: e.target.value})}
+                placeholder="e.g., CMP/A1B2/XY"
+                data-testid="edit-custom-id-input"
               />
             </div>
             <div className="space-y-2">
@@ -587,6 +596,7 @@ const Assets = () => {
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="coming_soon">Coming Soon</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -614,6 +624,56 @@ const Assets = () => {
             <Button onClick={handleEditAsset} disabled={isSubmitting} data-testid="confirm-edit-btn">
               {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Assign Dialog for Shared Assets */}
+      <Dialog open={isBulkAssignOpen} onOpenChange={setIsBulkAssignOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Manage Users - {selectedAsset?.name}</DialogTitle>
+            <DialogDescription>
+              Add or remove users from this shared asset
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Assigned Users</Label>
+              <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
+                {getAllUsers().map(user => (
+                  <div key={user.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`user-${user.id}`}
+                      checked={bulkAssignData.user_ids.includes(user.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setBulkAssignData({
+                            ...bulkAssignData,
+                            user_ids: [...bulkAssignData.user_ids, user.id]
+                          });
+                        } else {
+                          setBulkAssignData({
+                            ...bulkAssignData,
+                            user_ids: bulkAssignData.user_ids.filter(id => id !== user.id)
+                          });
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`user-${user.id}`} className="text-sm cursor-pointer">
+                      {user.name} ({user.roll_no})
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkAssignOpen(false)}>Cancel</Button>
+            <Button onClick={() => handleBulkAssign('assign')} disabled={isSubmitting} data-testid="confirm-bulk-assign-btn">
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Update Assignment
             </Button>
           </DialogFooter>
         </DialogContent>
