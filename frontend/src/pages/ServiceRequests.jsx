@@ -161,7 +161,7 @@ const ServiceRequests = () => {
       await serviceRequestsAPI.create(formData);
       toast.success('Service request created');
       setIsCreateOpen(false);
-      setFormData({ asset_id: '', description: '', is_generic: false, remarks: '' });
+      setFormData({ asset_id: '', description: '', is_generic: false, remarks: '', images: [] });
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to create request');
