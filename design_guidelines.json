@@ -1,0 +1,175 @@
+{
+  "typography": {
+    "fonts": {
+      "headings": {
+        "family": "Chivo, sans-serif",
+        "url": "https://fonts.googleapis.com/css2?family=Chivo:wght@300;400;700;900&display=swap",
+        "weights": ["300", "400", "700", "900"],
+        "usage": "All headings (h1-h6). Use '900' for hero stats and '300' for elegant subtitles."
+      },
+      "body": {
+        "family": "IBM Plex Sans, sans-serif",
+        "url": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap",
+        "weights": ["400", "500", "600"],
+        "usage": "Main body text, paragraphs, labels, and UI elements."
+      },
+      "mono": {
+        "family": "JetBrains Mono, monospace",
+        "url": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap",
+        "weights": ["400", "700"],
+        "usage": "Asset IDs, Status Codes, Timestamps, and Technical Data."
+      }
+    },
+    "rules": {
+      "headings": "tracking-tight leading-none",
+      "overline": "uppercase tracking-[0.2em] text-xs font-bold text-muted-foreground",
+      "body": "leading-relaxed tracking-normal",
+      "dense_data": "text-xs tracking-tight leading-snug"
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "name": "Academic Deep Slate",
+        "shades": {
+          "DEFAULT": "#0F172A",
+          "foreground": "#F8FAFC",
+          "hover": "#1E293B"
+        }
+      },
+      "secondary": {
+        "name": "Lab Coat White",
+        "shades": {
+          "DEFAULT": "#F1F5F9",
+          "foreground": "#0F172A"
+        }
+      },
+      "accent": {
+        "name": "Electric Research Blue",
+        "shades": {
+          "DEFAULT": "#2563EB",
+          "foreground": "#FFFFFF",
+          "hover": "#1D4ED8"
+        }
+      },
+      "status": {
+        "success": { "bg": "#DCFCE7", "text": "#14532D", "border": "#22C55E" },
+        "warning": { "bg": "#FEF3C7", "text": "#78350F", "border": "#F59E0B" },
+        "error": { "bg": "#FEE2E2", "text": "#7F1D1D", "border": "#EF4444" },
+        "info": { "bg": "#E0F2FE", "text": "#0C4A6E", "border": "#0EA5E9" }
+      },
+      "backgrounds": {
+        "app": "#F8FAFC",
+        "card": "#FFFFFF",
+        "sidebar": "#FFFFFF"
+      }
+    },
+    "theme_strategy": {
+      "mode": "light",
+      "toggle_required": true,
+      "rules": "Light mode is default for readability in labs. Dark mode must use 'Slate' grays (#020617), never pure black."
+    }
+  },
+  "visual_enhancers": {
+    "surface_styles": {
+      "card_standard": "bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 rounded-lg",
+      "card_interactive": "bg-white border border-slate-200 shadow-sm hover:border-blue-500/50 hover:shadow-[0_4px_20px_-2px_rgba(37,99,235,0.1)] transition-all duration-300 rounded-lg group",
+      "glass_panel": "bg-white/80 backdrop-blur-xl border border-white/40 shadow-sm",
+      "tech_border": "border border-slate-200 relative overflow-hidden"
+    },
+    "textures": {
+      "noise_overlay": "opacity-[0.03] pointer-events-none fixed inset-0 z-50 mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"
+    }
+  },
+  "component_mapping": {
+    "cards": "components/ui/card.jsx (Use for dashboard widgets)",
+    "buttons": "components/ui/button.jsx (Customize with 'pill' shape or 'sharp' edges based on context)",
+    "inputs": "components/ui/input.jsx (Add h-11 for better touch targets)",
+    "tables": "components/ui/table.jsx (Critical for inventory - ensure dense mode is available)",
+    "dialogs": "components/ui/dialog.jsx (For Service Requests)",
+    "toasts": "components/ui/sonner.jsx (For notifications)",
+    "charts": "Recharts (Install via 'recharts' package)"
+  },
+  "grids": {
+    "dashboard_layout": {
+      "type": "Bento Grid (Mode B)",
+      "classes": "grid grid-cols-1 md:grid-cols-12 gap-6",
+      "areas": {
+        "sidebar": "hidden md:block md:col-span-2 lg:col-span-2 xl:col-span-2",
+        "main": "col-span-1 md:col-span-10 lg:col-span-10 xl:col-span-10"
+      }
+    },
+    "inventory_grid": {
+      "type": "Auto-fit Cards",
+      "classes": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+    }
+  },
+  "motion": {
+    "duration": {
+      "fast": "150ms",
+      "normal": "300ms",
+      "slow": "500ms"
+    },
+    "easing": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "micro_interactions": {
+      "hover_lift": "hover:-translate-y-1 transition-transform duration-300 ease-out",
+      "button_press": "active:scale-95 transition-transform duration-100",
+      "fade_in": "animate-in fade-in zoom-in-95 duration-300"
+    }
+  },
+  "accessibility": {
+    "contrast_check": "APCA preferred. Text-to-bg ratio must be > 4.5:1 for normal text.",
+    "focus_states": "ring-2 ring-offset-2 ring-blue-500 focus:outline-none",
+    "touch_targets": "Minimum 44px for all interactive elements on mobile."
+  },
+  "media": {
+    "image_urls": {
+      "login_background": {
+        "url": "https://images.unsplash.com/photo-1576669801838-1b1c52121e6a?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Modern lab workspace with computer",
+        "category": "background"
+      },
+      "empty_state_abstract": {
+        "url": "https://images.unsplash.com/photo-1765164478579-2c041dad2c7d?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Abstract blue geometric shapes",
+        "category": "illustration"
+      },
+      "assets": {
+        "monitor": "https://images.unsplash.com/photo-1770003354588-b1b7a9f6d459?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "server": "https://images.unsplash.com/photo-1762163516269-3c143e04175c?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "generic_hardware": "https://images.unsplash.com/photo-1761446812468-d88eef0d01da?crop=entropy&cs=srgb&fm=jpg&q=85"
+      }
+    }
+  },
+  "3d_libraries": {
+    "primary": "none",
+    "charting": "recharts",
+    "description": "Due to low latency requirements, avoid WebGL libraries. Use Recharts for data visualization and Framer Motion for UI transitions."
+  },
+  "instructions_to_main_agent": {
+    "do": [
+      "Use 'sonner' for all toast notifications.",
+      "Implement a 'Sidebar' layout for the dashboard.",
+      "Use 'data-testid' on ALL interactive elements.",
+      "Ensure the Admin Dashboard uses a Dense Grid for maximum data visibility.",
+      "Implement 'Transaction Locking' visually (e.g., disable buttons and show spinners during API calls).",
+      "Use 'Badge' components for status indicators (Active, Service Requested, etc.)."
+    ],
+    "dont": [
+      "DO NOT use 'Inter' font for headings. Use 'Chivo'.",
+      "DO NOT use Teal colors (#1B93A4).",
+      "DO NOT use native HTML <select> or <input type='date'>. Use Shadcn components.",
+      "DO NOT clutter the interface. Use negative space effectively."
+    ]
+  },
+  "universal_guidelines": [
+    "You tend to converge toward generic outputs. Avoid this.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition (e.g., transition: all).",
+    "You MUST NOT center align the app container.",
+    "Every interaction needs micro-animations.",
+    "Use 2-3x more spacing than feels comfortable."
+  ]
+}
