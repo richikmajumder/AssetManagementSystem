@@ -162,6 +162,16 @@ class IDEALLabAPITester:
         )
         if success:
             print(f"   Found {len(response)} users")
+            # Check for real users mentioned in the requirements
+            expected_names = ["Richik Majumder", "Pankaj Kumar Barman", "Sunil Patel", "Anshu Pal", "Test User"]
+            found_names = [user.get('name', '') for user in response]
+            print(f"   User names: {found_names}")
+            
+            for expected in expected_names:
+                if any(expected in name for name in found_names):
+                    print(f"✅ Found user: {expected}")
+                else:
+                    print(f"⚠️ Missing user: {expected}")
         return success
 
     def test_get_assets(self):
