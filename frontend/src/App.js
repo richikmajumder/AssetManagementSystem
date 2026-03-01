@@ -5,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { Toaster } from "./components/ui/sonner";
 
 // Pages
+import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Assets from "./pages/Assets";
@@ -13,6 +14,7 @@ import ServiceRequests from "./pages/ServiceRequests";
 import Consumables from "./pages/Consumables";
 import MyAssets from "./pages/MyAssets";
 import ActivityLogs from "./pages/ActivityLogs";
+import Profile from "./pages/Profile";
 
 // Layout
 import DashboardLayout from "./components/Layout/DashboardLayout";
@@ -23,6 +25,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public routes */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           
           {/* Protected routes */}
@@ -34,11 +37,11 @@ function App() {
             <Route path="/consumables" element={<Consumables />} />
             <Route path="/my-assets" element={<MyAssets />} />
             <Route path="/logs" element={<ActivityLogs />} />
+            <Route path="/profile" element={<Profile />} />
           </Route>
           
-          {/* Redirects */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors closeButton />
