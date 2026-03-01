@@ -42,6 +42,15 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (email, password) => api.post('/auth/login', { email, password }),
   getMe: () => api.get('/auth/me'),
+  changePassword: (currentPassword, newPassword) => 
+    api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
+  uploadPhoto: (photoBase64) => {
+    const formData = new FormData();
+    formData.append('photo_base64', photoBase64);
+    return api.post('/auth/upload-photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
 };
 
 // Users API
@@ -63,6 +72,7 @@ export const assetsAPI = {
   update: (id, assetData) => api.patch(`/assets/${id}`, assetData),
   delete: (id) => api.delete(`/assets/${id}`),
   assign: (data) => api.post('/assets/assign', data),
+  bulkAssign: (data) => api.post('/assets/bulk-assign', data),
   returnAsset: (id) => api.post(`/assets/${id}/return`),
 };
 
