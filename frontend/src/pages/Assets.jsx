@@ -483,6 +483,7 @@ const Assets = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Asset ID</TableHead>
+                <TableHead>Custom ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
@@ -493,7 +494,7 @@ const Assets = () => {
             <TableBody>
               {filteredAssets.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-slate-400">
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-400">
                     <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     No assets found
                   </TableCell>
@@ -501,7 +502,8 @@ const Assets = () => {
               ) : (
                 filteredAssets.map((asset) => (
                   <TableRow key={asset.id} data-testid={`asset-row-${asset.id}`}>
-                    <TableCell className="font-mono text-xs">{asset.asset_id}</TableCell>
+                    <TableCell className="font-mono text-xs text-slate-500">{asset.asset_id}</TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-blue-600">{asset.custom_asset_id || '-'}</TableCell>
                     <TableCell className="font-medium">{asset.name}</TableCell>
                     <TableCell className="capitalize">{asset.asset_type.replace('_', ' ')}</TableCell>
                     <TableCell><StatusBadge status={asset.status} /></TableCell>
@@ -524,6 +526,12 @@ const Assets = () => {
                               <Edit className="w-4 h-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
+                            {asset.is_shared && (
+                              <DropdownMenuItem onClick={() => openBulkAssignDialog(asset)}>
+                                <UserPlus className="w-4 h-4 mr-2" />
+                                Manage Users
+                              </DropdownMenuItem>
+                            )}
                             {isAdmin && (
                               <DropdownMenuItem 
                                 className="text-red-600" 
