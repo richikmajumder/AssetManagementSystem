@@ -121,6 +121,20 @@ class IDEALLabAPITester:
         )
         if success:
             print(f"   Stats: {json.dumps(response, indent=2)[:200]}...")
+            # Check for expected counts
+            users_count = response.get('total_users', 0)
+            assets_count = response.get('total_assets', 0)
+            print(f"   Users: {users_count}, Assets: {assets_count}")
+            # Expected: 6 users (admin + 5 real users), 40 assets
+            if users_count == 6:
+                print(f"✅ Correct user count: {users_count}")
+            else:
+                print(f"⚠️ Expected 6 users, found {users_count}")
+            
+            if assets_count >= 35:  # Should be around 40, allowing some variance
+                print(f"✅ Asset count looks good: {assets_count}")  
+            else:
+                print(f"⚠️ Expected ~40 assets, found {assets_count}")
         return success
 
     def test_user_dashboard_stats(self):
