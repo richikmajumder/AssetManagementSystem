@@ -58,22 +58,32 @@ const StatusBadge = ({ status }) => {
     work_in_progress: { label: 'In Progress', class: 'status-work-in-progress' },
     inactive: { label: 'Inactive', class: 'status-rejected' },
     unassigned: { label: 'Unassigned', class: 'status-unassigned' },
+    coming_soon: { label: 'Coming Soon', class: 'bg-purple-50 text-purple-700 border-purple-200' },
   };
   const config = statusConfig[status] || { label: status, class: 'bg-slate-100' };
   return <Badge variant="outline" className={`${config.class} text-xs`}>{config.label}</Badge>;
 };
 
 const ASSET_TYPES = [
+  { value: 'chair', label: 'Chair' },
   { value: 'cubicle', label: 'Cubicle' },
   { value: 'monitor', label: 'Monitor' },
-  { value: 'keyboard', label: 'Keyboard' },
-  { value: 'chair', label: 'Chair' },
   { value: 'cpu', label: 'CPU' },
   { value: 'mouse', label: 'Mouse' },
+  { value: 'keyboard', label: 'Keyboard' },
+  { value: 'ups', label: 'UPS' },
+  { value: 'adapter', label: 'Adapter' },
+  { value: 'wifi_adapter', label: 'WiFi Adapter' },
+  { value: 'hdmi_cable', label: 'HDMI Cable' },
+  { value: 'lan_cable', label: 'LAN Cable' },
+  { value: 'printer', label: 'Printer' },
   { value: 'server', label: 'Server' },
-  { value: 'pen_drive', label: 'Pen Drive' },
+  { value: 'locker', label: 'Locker' },
+  { value: 'whiteboard', label: 'Whiteboard' },
+  { value: 'extension', label: 'Extension Board' },
   { value: 'book', label: 'Book' },
-  { value: 'other', label: 'Other' },
+  { value: 'storage', label: 'Storage (Pen Drive, HDD, etc.)' },
+  { value: 'miscellaneous', label: 'Miscellaneous' },
 ];
 
 const Assets = () => {
