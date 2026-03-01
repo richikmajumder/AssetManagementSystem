@@ -330,7 +330,7 @@ const ServiceRequests = () => {
                   Service Request
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-lg">
                 <DialogHeader>
                   <DialogTitle>Create Service Request</DialogTitle>
                   <DialogDescription>Report an issue with your assigned asset</DialogDescription>
@@ -348,7 +348,7 @@ const ServiceRequests = () => {
                       <SelectContent>
                         {myAssets.map(asset => (
                           <SelectItem key={asset.id} value={asset.id}>
-                            {asset.name} ({asset.asset_id})
+                            {asset.name} ({asset.custom_asset_id || asset.asset_id})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -362,6 +362,34 @@ const ServiceRequests = () => {
                       placeholder="Describe the issue in detail"
                       data-testid="service-request-description"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Upload Images (Max 4)</Label>
+                    <Input 
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageUpload}
+                      disabled={formData.images.length >= 4}
+                      data-testid="service-request-images"
+                    />
+                    {formData.images.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {formData.images.map((img, index) => (
+                          <div key={index} className="relative">
+                            <img src={img} alt={`Upload ${index + 1}`} className="w-16 h-16 object-cover rounded border" />
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-slate-500">{formData.images.length}/4 images uploaded</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Additional Remarks</Label>
