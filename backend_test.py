@@ -92,7 +92,7 @@ class IDEALLabAPITester:
             "POST",
             "auth/login",
             200,
-            data={"email": "rahul@iitk.ac.in", "password": "password123"}
+            data={"email": "richik24@iitk.ac.in", "password": "password123"}
         )
         if success and 'token' in response:
             self.user_token = response['token']
