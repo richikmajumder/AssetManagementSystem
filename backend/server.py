@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -12,8 +12,9 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
-from bson import ObjectId
 import base64
+import random
+import string
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -41,29 +42,6 @@ logger = logging.getLogger(__name__)
 
 # ==================== MODELS ====================
 
-class UserRole(str):
-    ADMIN = "admin"
-    CO_ADMIN = "co_admin"
-    USER = "user"
-
-class AssetStatus(str):
-    ACTIVE = "active"
-    SERVICE_REQUESTED = "service_requested"
-    WORK_IN_PROGRESS = "work_in_progress"
-    INACTIVE = "inactive"
-    UNASSIGNED = "unassigned"
-
-class RequestStatus(str):
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    RESOLVED = "resolved"
-
-class OrderStatus(str):
-    PENDING = "pending"
-    ORDERED = "ordered"
-    REJECTED = "rejected"
-
 # User Models
 class UserCreate(BaseModel):
     name: str
@@ -71,6 +49,7 @@ class UserCreate(BaseModel):
     roll_no: str
     programme: str
     password: str
+    phone: Optional[str] = None
     role: Literal["admin", "co_admin", "user"] = "user"
 
 class UserUpdate(BaseModel):
@@ -78,10 +57,12 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     roll_no: Optional[str] = None
     programme: Optional[str] = None
+    phone: Optional[str] = None
     role: Optional[Literal["admin", "co_admin", "user"]] = None
     is_flagged: Optional[bool] = None
     is_blacklisted: Optional[bool] = None
     is_active: Optional[bool] = None
+    profile_photo: Optional[str] = None
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -90,11 +71,13 @@ class UserResponse(BaseModel):
     email: str
     roll_no: str
     programme: str
+    phone: Optional[str] = None
     role: str
     initial_role: str
     is_flagged: bool = False
     is_blacklisted: bool = False
     is_active: bool = True
+    profile_photo: Optional[str] = None
     created_at: str
     updated_at: str
 
@@ -107,34 +90,48 @@ class LoginResponse(BaseModel):
     user: UserResponse
 
 class PasswordChangeRequest(BaseModel):
-    user_id: Optional[str] = None
+    current_password: Optional[str] = None
     new_password: str
 
-# Asset Models
-class AssetType(str):
-    CUBICLE = "cubicle"
-    MONITOR = "monitor"
-    KEYBOARD = "keyboard"
-    CHAIR = "chair"
-    CPU = "cpu"
-    MOUSE = "mouse"
-    SERVER = "server"
-    PEN_DRIVE = "pen_drive"
-    BOOK = "book"
-    OTHER = "other"
+# Asset Models - Updated with new format
+ASSET_CATEGORIES = {
+    "chair": "FRN",       # Furniture
+    "cubicle": "FRN",     # Furniture
+    "monitor": "CMP",     # Computer Equipment
+    "cpu": "CMP",         # Computer Equipment
+    "mouse": "CMP",       # Computer Equipment
+    "keyboard": "CMP",    # Computer Equipment
+    "ups": "PWR",         # Power Equipment
+    "adapter": "ACC",     # Accessories
+    "wifi_adapter": "NET", # Network Equipment
+    "hdmi_cable": "CBL",  # Cables
+    "lan_cable": "CBL",   # Cables
+    "printer": "PRN",     # Printer
+    "server": "SRV",      # Server
+    "locker": "STR",      # Storage
+    "whiteboard": "OFC",  # Office Equipment
+    "extension": "PWR",   # Power Equipment
+    "book": "BK",         # Books
+    "storage": "STR",     # Storage devices (pen drives, HDD, etc.)
+    "miscellaneous": "MSC", # Miscellaneous
+    "other": "MSC",       # Miscellaneous
+}
 
 class AssetCreate(BaseModel):
     asset_type: str
     name: str
     description: Optional[str] = None
+    custom_asset_id: Optional[str] = None  # XYZ/ABCD/EF format
     is_shared: bool = False
     is_returnable: bool = False
     assigned_user_ids: Optional[List[str]] = None
+    status: Optional[str] = "unassigned"
 
 class AssetUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    status: Optional[Literal["active", "service_requested", "work_in_progress", "inactive", "unassigned"]] = None
+    custom_asset_id: Optional[str] = None
+    status: Optional[Literal["active", "service_requested", "work_in_progress", "inactive", "unassigned", "coming_soon"]] = None
     is_shared: Optional[bool] = None
     is_returnable: Optional[bool] = None
     assigned_user_ids: Optional[List[str]] = None
@@ -143,6 +140,7 @@ class AssetResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     asset_id: str
+    custom_asset_id: Optional[str] = None
     asset_type: str
     name: str
     description: Optional[str] = None
@@ -159,12 +157,17 @@ class UserAssetCreate(BaseModel):
     asset_type: str
     custom_id: Optional[str] = None
 
-# Service Request Models
+class AssetAssignUpdate(BaseModel):
+    asset_id: str
+    user_ids: List[str]
+    action: Literal["assign", "unassign"]
+
+# Service Request Models - Updated with images
 class ServiceRequestCreate(BaseModel):
     asset_id: str
     description: str
     is_generic: bool = False
-    images: Optional[List[str]] = None
+    images: Optional[List[str]] = None  # base64 images, max 4
     remarks: Optional[str] = None
 
 class ServiceRequestUpdate(BaseModel):
@@ -216,7 +219,7 @@ class ConsumableOrderResponse(BaseModel):
     created_at: str
     updated_at: str
 
-# Asset Request Models (for requesting new items)
+# Asset Request Models
 class AssetRequestCreate(BaseModel):
     asset_type: str
     description: str
@@ -308,19 +311,25 @@ async def require_admin_or_coadmin(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin or Co-Admin access required")
     return user
 
+def generate_random_code(length: int = 4) -> str:
+    """Generate random alphanumeric code"""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
 async def generate_asset_id(asset_type: str) -> str:
-    """Generate unique asset ID like MON-2026001"""
-    type_prefix = {
-        "cubicle": "CUB", "monitor": "MON", "keyboard": "KBD", "chair": "CHR",
-        "cpu": "CPU", "mouse": "MOU", "server": "SRV", "pen_drive": "PD",
-        "book": "BK", "other": "OTH"
-    }
-    prefix = type_prefix.get(asset_type.lower(), "OTH")
+    """Generate unique asset ID in format like CMP-2026001"""
+    prefix = ASSET_CATEGORIES.get(asset_type.lower(), "MSC")
     year = datetime.now(timezone.utc).year
     
-    # Count existing assets of this type this year
+    # Count existing assets with this prefix
     count = await db.assets.count_documents({"asset_id": {"$regex": f"^{prefix}-{year}"}})
     return f"{prefix}-{year}{str(count + 1).zfill(3)}"
+
+def generate_custom_asset_id(asset_type: str) -> str:
+    """Generate custom asset ID in XYZ/ABCD/EF format"""
+    prefix = ASSET_CATEGORIES.get(asset_type.lower(), "MSC")
+    middle = generate_random_code(4)
+    suffix = generate_random_code(2)
+    return f"{prefix}/{middle}/{suffix}"
 
 async def generate_request_id(prefix: str = "SR") -> str:
     """Generate unique request ID"""
@@ -395,6 +404,31 @@ async def login(request: LoginRequest):
 async def get_me(user: dict = Depends(get_current_user)):
     return {k: v for k, v in user.items() if k != "password"}
 
+@api_router.post("/auth/change-password")
+async def change_own_password(request: PasswordChangeRequest, user: dict = Depends(get_current_user)):
+    """User changes their own password"""
+    # Verify current password if provided (for non-admin self-change)
+    if request.current_password:
+        if not verify_password(request.current_password, user["password"]):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    await db.users.update_one({"id": user["id"]}, {
+        "$set": {"password": hash_password(request.new_password), "updated_at": datetime.now(timezone.utc).isoformat()}
+    })
+    
+    return {"message": "Password changed successfully"}
+
+@api_router.post("/auth/upload-photo")
+async def upload_profile_photo(photo_base64: str = Form(...), user: dict = Depends(get_current_user)):
+    """Upload profile photo"""
+    await db.users.update_one({"id": user["id"]}, {
+        "$set": {"profile_photo": photo_base64, "updated_at": datetime.now(timezone.utc).isoformat()}
+    })
+    return {"message": "Profile photo updated"}
+
 # ==================== USER MANAGEMENT ENDPOINTS ====================
 
 @api_router.post("/users", response_model=UserResponse)
@@ -417,38 +451,19 @@ async def create_user(user_data: UserCreate, admin: dict = Depends(require_admin
         "email": user_data.email,
         "roll_no": user_data.roll_no,
         "programme": user_data.programme,
+        "phone": user_data.phone,
         "password": hash_password(user_data.password),
         "role": user_data.role,
         "initial_role": user_data.role,
         "is_flagged": False,
         "is_blacklisted": False,
         "is_active": True,
+        "profile_photo": None,
         "created_at": now,
         "updated_at": now
     }
     
     await db.users.insert_one(user)
-    
-    # Create default assets for regular users
-    if user_data.role == "user":
-        default_types = ["cubicle", "monitor", "keyboard", "chair", "cpu", "mouse"]
-        for asset_type in default_types:
-            asset_id = await generate_asset_id(asset_type)
-            asset = {
-                "id": str(uuid.uuid4()),
-                "asset_id": asset_id,
-                "asset_type": asset_type,
-                "name": f"{asset_type.capitalize()} - {user_data.name}",
-                "description": f"Default {asset_type} assigned to {user_data.name}",
-                "status": "active",
-                "is_shared": False,
-                "is_returnable": False,
-                "assigned_user_ids": [user_id],
-                "created_at": now,
-                "updated_at": now,
-                "version": 1
-            }
-            await db.assets.insert_one(asset)
     
     await log_activity(admin["id"], admin["name"], admin["role"], "CREATE_USER",
                        "user", user_id, {"name": user_data.name, "role": user_data.role})
@@ -483,16 +498,13 @@ async def update_user(user_id: str, update: UserUpdate, admin: dict = Depends(re
     
     # Co-admin restrictions
     if admin["role"] == "co_admin":
-        # Cannot modify admin or themselves
         if user["role"] == "admin" or user_id == admin["id"]:
             raise HTTPException(status_code=403, detail="Cannot modify this user")
-        # Cannot upgrade to co-admin
         if update.role == "co_admin":
             raise HTTPException(status_code=403, detail="Cannot upgrade to co-admin")
     
     # Role change restrictions
     if update.role:
-        # Co-admin can only be downgraded if initial role was user
         if user["role"] == "co_admin" and update.role == "user":
             if user["initial_role"] != "user":
                 raise HTTPException(status_code=400, detail="Co-admin with initial co-admin role cannot be downgraded")
@@ -505,7 +517,6 @@ async def update_user(user_id: str, update: UserUpdate, admin: dict = Depends(re
     await log_activity(admin["id"], admin["name"], admin["role"], "UPDATE_USER",
                        "user", user_id, update_data)
     
-    # Notify user if flagged/blacklisted
     if update.is_flagged is not None or update.is_blacklisted is not None:
         msg = "Your account has been " + ("flagged" if update.is_flagged else "unflagged" if update.is_flagged is False else "blacklisted" if update.is_blacklisted else "unblacklisted")
         await create_notification(user_id, msg, "account_status")
@@ -520,7 +531,6 @@ async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Deactivate user
     await db.users.update_one({"id": user_id}, {
         "$set": {"is_active": False, "updated_at": datetime.now(timezone.utc).isoformat()}
     })
@@ -543,7 +553,7 @@ async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
     return {"message": "User deactivated and assets unassigned"}
 
 @api_router.post("/users/{user_id}/change-password")
-async def change_password(user_id: str, request: PasswordChangeRequest, admin: dict = Depends(require_admin)):
+async def admin_change_password(user_id: str, request: PasswordChangeRequest, admin: dict = Depends(require_admin)):
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -563,14 +573,18 @@ async def change_password(user_id: str, request: PasswordChangeRequest, admin: d
 async def create_asset(asset_data: AssetCreate, admin: dict = Depends(require_admin_or_coadmin)):
     now = datetime.now(timezone.utc).isoformat()
     asset_id = await generate_asset_id(asset_data.asset_type)
+    custom_asset_id = asset_data.custom_asset_id or generate_custom_asset_id(asset_data.asset_type)
+    
+    status = asset_data.status or ("unassigned" if not asset_data.assigned_user_ids else "active")
     
     asset = {
         "id": str(uuid.uuid4()),
         "asset_id": asset_id,
+        "custom_asset_id": custom_asset_id,
         "asset_type": asset_data.asset_type,
         "name": asset_data.name,
         "description": asset_data.description,
-        "status": "unassigned" if not asset_data.assigned_user_ids else "active",
+        "status": status,
         "is_shared": asset_data.is_shared,
         "is_returnable": asset_data.is_returnable,
         "assigned_user_ids": asset_data.assigned_user_ids or [],
@@ -582,7 +596,7 @@ async def create_asset(asset_data: AssetCreate, admin: dict = Depends(require_ad
     await db.assets.insert_one(asset)
     
     await log_activity(admin["id"], admin["name"], admin["role"], "CREATE_ASSET",
-                       "asset", asset["id"], {"asset_id": asset_id, "type": asset_data.asset_type})
+                       "asset", asset["id"], {"asset_id": asset_id, "custom_asset_id": custom_asset_id, "type": asset_data.asset_type})
     
     return asset
 
@@ -618,7 +632,6 @@ async def get_asset(asset_id: str, user: dict = Depends(get_current_user)):
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     
-    # Users can only see their own assets
     if user["role"] == "user" and user["id"] not in asset.get("assigned_user_ids", []):
         raise HTTPException(status_code=403, detail="Access denied")
     
@@ -626,27 +639,25 @@ async def get_asset(asset_id: str, user: dict = Depends(get_current_user)):
 
 @api_router.patch("/assets/{asset_id}", response_model=AssetResponse)
 async def update_asset(asset_id: str, update: AssetUpdate, admin: dict = Depends(require_admin_or_coadmin)):
-    # Co-admin cannot delete/significantly modify
     asset = await db.assets.find_one({"id": asset_id}, {"_id": 0})
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     
-    # Check for assignment conflicts
-    if update.assigned_user_ids:
-        if not asset["is_shared"]:
-            for uid in update.assigned_user_ids:
-                existing = await db.assets.find_one({
-                    "id": {"$ne": asset_id},
-                    "asset_type": asset["asset_type"],
-                    "assigned_user_ids": uid,
-                    "is_shared": False
-                })
-                if existing:
-                    user = await db.users.find_one({"id": uid}, {"_id": 0})
-                    raise HTTPException(
-                        status_code=400, 
-                        detail=f"This item is already assigned to {user['name'] if user else 'another user'}"
-                    )
+    # Check for assignment conflicts for non-shared assets
+    if update.assigned_user_ids and not asset.get("is_shared", False) and not update.is_shared:
+        for uid in update.assigned_user_ids:
+            existing = await db.assets.find_one({
+                "id": {"$ne": asset_id},
+                "asset_type": asset["asset_type"],
+                "assigned_user_ids": uid,
+                "is_shared": False
+            })
+            if existing:
+                user = await db.users.find_one({"id": uid}, {"_id": 0})
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"This item is already assigned to {user['name'] if user else 'another user'}"
+                )
     
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -667,7 +678,6 @@ async def delete_asset(asset_id: str, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=404, detail="Asset not found")
     
     if asset.get("assigned_user_ids"):
-        # Get user names
         user_ids = asset["assigned_user_ids"]
         users = await db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "name": 1}).to_list(100)
         names = [u["name"] for u in users]
@@ -708,12 +718,14 @@ async def assign_asset(data: UserAssetCreate, admin: dict = Depends(require_admi
         asset = await db.assets.find_one({"id": available["id"]}, {"_id": 0})
     else:
         # Create new asset
-        asset_id = data.custom_id or await generate_asset_id(data.asset_type)
+        asset_id = await generate_asset_id(data.asset_type)
+        custom_asset_id = data.custom_id or generate_custom_asset_id(data.asset_type)
         asset = {
             "id": str(uuid.uuid4()),
             "asset_id": asset_id,
+            "custom_asset_id": custom_asset_id,
             "asset_type": data.asset_type,
-            "name": f"{data.asset_type.capitalize()} - {user['name']}",
+            "name": f"{data.asset_type.replace('_', ' ').title()} - {user['name']}",
             "description": None,
             "status": "active",
             "is_shared": False,
@@ -728,9 +740,42 @@ async def assign_asset(data: UserAssetCreate, admin: dict = Depends(require_admi
     await log_activity(admin["id"], admin["name"], admin["role"], "ASSIGN_ASSET",
                        "asset", asset["id"], {"user_id": data.user_id, "asset_type": data.asset_type})
     
-    await create_notification(data.user_id, f"New {data.asset_type} has been assigned to you", "asset_assigned", asset["id"])
+    await create_notification(data.user_id, f"New {data.asset_type.replace('_', ' ')} has been assigned to you", "asset_assigned", asset["id"])
     
     return asset
+
+@api_router.post("/assets/bulk-assign")
+async def bulk_assign_assets(data: AssetAssignUpdate, admin: dict = Depends(require_admin_or_coadmin)):
+    """Assign or unassign asset to multiple users (for shared assets)"""
+    asset = await db.assets.find_one({"id": data.asset_id}, {"_id": 0})
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    if data.action == "assign":
+        # Add users to assigned list
+        await db.assets.update_one({"id": data.asset_id}, {
+            "$addToSet": {"assigned_user_ids": {"$each": data.user_ids}},
+            "$set": {"status": "active", "updated_at": now}
+        })
+        for uid in data.user_ids:
+            await create_notification(uid, f"You have been assigned to {asset['name']}", "asset_assigned", asset["id"])
+    else:
+        # Remove users from assigned list
+        await db.assets.update_one({"id": data.asset_id}, {
+            "$pull": {"assigned_user_ids": {"$in": data.user_ids}},
+            "$set": {"updated_at": now}
+        })
+        # Check if any users left
+        updated = await db.assets.find_one({"id": data.asset_id}, {"_id": 0})
+        if not updated.get("assigned_user_ids"):
+            await db.assets.update_one({"id": data.asset_id}, {"$set": {"status": "unassigned"}})
+    
+    await log_activity(admin["id"], admin["name"], admin["role"], f"{data.action.upper()}_ASSET",
+                       "asset", data.asset_id, {"user_ids": data.user_ids, "action": data.action})
+    
+    return await db.assets.find_one({"id": data.asset_id}, {"_id": 0})
 
 @api_router.post("/assets/{asset_id}/return")
 async def return_asset(asset_id: str, user: dict = Depends(get_current_user)):
@@ -745,7 +790,6 @@ async def return_asset(asset_id: str, user: dict = Depends(get_current_user)):
     if user["id"] not in asset.get("assigned_user_ids", []):
         raise HTTPException(status_code=403, detail="Asset not assigned to you")
     
-    # Create return request
     request_id = await generate_request_id("RET")
     now = datetime.now(timezone.utc).isoformat()
     
@@ -761,7 +805,6 @@ async def return_asset(asset_id: str, user: dict = Depends(get_current_user)):
     
     await db.return_requests.insert_one(return_request)
     
-    # Notify admins
     admins = await db.users.find({"role": {"$in": ["admin", "co_admin"]}, "is_active": True}, {"_id": 0}).to_list(100)
     for admin in admins:
         await create_notification(admin["id"], f"{user['name']} requested to return {asset['name']}", "return_request", return_request["id"])
@@ -772,7 +815,6 @@ async def return_asset(asset_id: str, user: dict = Depends(get_current_user)):
 
 @api_router.post("/service-requests", response_model=ServiceRequestResponse)
 async def create_service_request(request: ServiceRequestCreate, user: dict = Depends(get_current_user)):
-    # Check if asset exists and user has access
     asset = await db.assets.find_one({"id": request.asset_id}, {"_id": 0})
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
@@ -780,11 +822,14 @@ async def create_service_request(request: ServiceRequestCreate, user: dict = Dep
     if user["id"] not in asset.get("assigned_user_ids", []):
         raise HTTPException(status_code=403, detail="Asset not assigned to you")
     
-    # Check cooldown
     if not await check_cooldown(user["id"], request.asset_id):
         raise HTTPException(status_code=400, detail="You cannot raise another request for this asset. Please wait 7 days after rejection.")
     
-    # Co-admin upgraded from user: request goes to main admin only
+    # Validate images (max 4)
+    images = request.images or []
+    if len(images) > 4:
+        raise HTTPException(status_code=400, detail="Maximum 4 images allowed")
+    
     request_for_admin = user["role"] == "co_admin" and user["initial_role"] == "user"
     
     request_id = await generate_request_id("SR")
@@ -798,7 +843,7 @@ async def create_service_request(request: ServiceRequestCreate, user: dict = Dep
         "description": request.description,
         "status": "pending",
         "is_generic": request.is_generic,
-        "images": request.images or [],
+        "images": images,
         "remarks": request.remarks,
         "admin_remarks": None,
         "request_for_admin_only": request_for_admin,
@@ -808,12 +853,10 @@ async def create_service_request(request: ServiceRequestCreate, user: dict = Dep
     
     await db.service_requests.insert_one(service_request)
     
-    # Update asset status
     await db.assets.update_one({"id": request.asset_id}, {
         "$set": {"status": "service_requested", "updated_at": now}
     })
     
-    # Notify admins
     query = {"role": "admin", "is_active": True} if request_for_admin else {"role": {"$in": ["admin", "co_admin"]}, "is_active": True}
     admins = await db.users.find(query, {"_id": 0}).to_list(100)
     for admin in admins:
@@ -833,7 +876,6 @@ async def get_service_requests(
     if user_id:
         query["user_id"] = user_id
     
-    # Co-admin cannot see requests meant for admin only
     if admin["role"] == "co_admin":
         query["request_for_admin_only"] = {"$ne": True}
     
@@ -851,7 +893,6 @@ async def update_service_request(request_id: str, update: ServiceRequestUpdate, 
     if not sr:
         raise HTTPException(status_code=404, detail="Service request not found")
     
-    # Co-admin cannot handle admin-only requests
     if admin["role"] == "co_admin" and sr.get("request_for_admin_only"):
         raise HTTPException(status_code=403, detail="This request can only be handled by admin")
     
@@ -861,7 +902,6 @@ async def update_service_request(request_id: str, update: ServiceRequestUpdate, 
     
     await db.service_requests.update_one({"id": request_id}, {"$set": update_data})
     
-    # Update asset status based on request status
     asset_status_map = {
         "approved": "work_in_progress",
         "rejected": "active",
@@ -869,12 +909,9 @@ async def update_service_request(request_id: str, update: ServiceRequestUpdate, 
     }
     
     if update.status in asset_status_map:
-        # For generic requests on shared assets, update for all assigned users
-        asset = await db.assets.find_one({"id": sr["asset_id"]}, {"_id": 0})
         new_status = asset_status_map[update.status]
         await db.assets.update_one({"id": sr["asset_id"]}, {"$set": {"status": new_status, "updated_at": now}})
     
-    # Notify user
     status_messages = {
         "approved": "Your service request has been approved",
         "rejected": "Your service request has been rejected",
@@ -883,7 +920,6 @@ async def update_service_request(request_id: str, update: ServiceRequestUpdate, 
     if update.status in status_messages:
         await create_notification(sr["user_id"], f"{status_messages[update.status]}: {sr['request_id']}", "service_request_update", request_id)
         
-        # For generic requests on shared assets, notify all users
         if sr.get("is_generic"):
             asset = await db.assets.find_one({"id": sr["asset_id"]}, {"_id": 0})
             if asset and asset.get("is_shared"):
@@ -903,11 +939,10 @@ async def resolve_service_request(request_id: str, user: dict = Depends(get_curr
     if not sr:
         raise HTTPException(status_code=404, detail="Service request not found")
     
-    # Only the requester or admin can resolve
     if user["role"] == "user" and sr["user_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    if sr["status"] != "approved" and sr["status"] != "work_in_progress":
+    if sr["status"] not in ["approved", "work_in_progress"]:
         raise HTTPException(status_code=400, detail="Can only resolve approved or in-progress requests")
     
     now = datetime.now(timezone.utc).isoformat()
@@ -922,11 +957,10 @@ async def resolve_service_request(request_id: str, user: dict = Depends(get_curr
     
     return {"message": "Service request resolved"}
 
-# ==================== ASSET REQUEST ENDPOINTS (for new items) ====================
+# ==================== ASSET REQUEST ENDPOINTS ====================
 
 @api_router.post("/asset-requests", response_model=AssetRequestResponse)
 async def create_asset_request(request: AssetRequestCreate, user: dict = Depends(get_current_user)):
-    """User requests for a new asset type"""
     request_id = await generate_request_id("AR")
     now = datetime.now(timezone.utc).isoformat()
     
@@ -945,7 +979,6 @@ async def create_asset_request(request: AssetRequestCreate, user: dict = Depends
     
     await db.asset_requests.insert_one(asset_request)
     
-    # Notify admins
     admins = await db.users.find({"role": {"$in": ["admin", "co_admin"]}, "is_active": True}, {"_id": 0}).to_list(100)
     for admin in admins:
         await create_notification(admin["id"], f"New asset request {request_id} from {user['name']}", "asset_request", asset_request["id"])
@@ -978,10 +1011,8 @@ async def update_asset_request(request_id: str, status: str, admin_remarks: Opti
     
     await db.asset_requests.update_one({"id": request_id}, {"$set": update_data})
     
-    # If approved, assign assets
     if status == "approved":
         for _ in range(ar["quantity"]):
-            # Try to find available asset first
             available = await db.assets.find_one({
                 "asset_type": ar["asset_type"],
                 "status": "unassigned",
@@ -994,14 +1025,15 @@ async def update_asset_request(request_id: str, status: str, admin_remarks: Opti
                     "$set": {"status": "active", "updated_at": now}
                 })
             else:
-                # Create new asset
                 asset_id = await generate_asset_id(ar["asset_type"])
+                custom_asset_id = generate_custom_asset_id(ar["asset_type"])
                 user = await db.users.find_one({"id": ar["user_id"]}, {"_id": 0})
                 asset = {
                     "id": str(uuid.uuid4()),
                     "asset_id": asset_id,
+                    "custom_asset_id": custom_asset_id,
                     "asset_type": ar["asset_type"],
-                    "name": f"{ar['asset_type'].capitalize()} - {user['name'] if user else 'Unknown'}",
+                    "name": f"{ar['asset_type'].replace('_', ' ').title()} - {user['name'] if user else 'Unknown'}",
                     "description": None,
                     "status": "active",
                     "is_shared": False,
@@ -1013,7 +1045,6 @@ async def update_asset_request(request_id: str, status: str, admin_remarks: Opti
                 }
                 await db.assets.insert_one(asset)
     
-    # Notify user
     await create_notification(ar["user_id"], f"Your asset request {ar['request_id']} has been {status}", "asset_request_update", request_id)
     
     await log_activity(admin["id"], admin["name"], admin["role"], "UPDATE_ASSET_REQUEST",
@@ -1051,7 +1082,6 @@ async def create_consumable_order(order: ConsumableOrderCreate, user: dict = Dep
     
     await db.consumables.insert_one(consumable)
     
-    # Notify admins
     admins = await db.users.find({"role": {"$in": ["admin", "co_admin"]}, "is_active": True}, {"_id": 0}).to_list(100)
     for admin in admins:
         await create_notification(admin["id"], f"New consumable order {request_id} from {user['name']}", "consumable_order", consumable["id"])
@@ -1060,7 +1090,6 @@ async def create_consumable_order(order: ConsumableOrderCreate, user: dict = Dep
 
 @api_router.post("/consumables/direct", response_model=ConsumableOrderResponse)
 async def create_direct_consumable(order: ConsumableOrderCreate, admin: dict = Depends(require_admin_or_coadmin)):
-    """Admin directly adds consumable without request"""
     request_id = await generate_request_id("CON")
     now = datetime.now(timezone.utc).isoformat()
     
@@ -1114,7 +1143,6 @@ async def update_consumable(order_id: str, update: ConsumableOrderUpdate, admin:
     
     await db.consumables.update_one({"id": order_id}, {"$set": update_data})
     
-    # Notify users
     for uid in order["user_ids"]:
         await create_notification(uid, f"Your consumable order {order['request_id']} has been {update.status}", "consumable_update", order_id)
     
@@ -1182,20 +1210,17 @@ async def get_activity_logs(
 
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(admin: dict = Depends(require_admin_or_coadmin)):
-    """Get overview statistics for admin dashboard"""
     total_users = await db.users.count_documents({"is_active": True})
     total_assets = await db.assets.count_documents({})
     pending_service_requests = await db.service_requests.count_documents({"status": "pending"})
     pending_asset_requests = await db.asset_requests.count_documents({"status": "pending"})
     pending_consumables = await db.consumables.count_documents({"status": "pending"})
     
-    # Asset counts by type
     asset_pipeline = [
         {"$group": {"_id": "$asset_type", "count": {"$sum": 1}}}
     ]
     asset_counts = await db.assets.aggregate(asset_pipeline).to_list(100)
     
-    # Asset counts by status
     status_pipeline = [
         {"$group": {"_id": "$status", "count": {"$sum": 1}}}
     ]
@@ -1213,7 +1238,6 @@ async def get_dashboard_stats(admin: dict = Depends(require_admin_or_coadmin)):
 
 @api_router.get("/dashboard/user-stats")
 async def get_user_dashboard_stats(user: dict = Depends(get_current_user)):
-    """Get statistics for user dashboard"""
     my_assets = await db.assets.count_documents({"assigned_user_ids": user["id"]})
     my_service_requests = await db.service_requests.count_documents({"user_id": user["id"]})
     pending_requests = await db.service_requests.count_documents({"user_id": user["id"], "status": "pending"})
@@ -1251,7 +1275,6 @@ async def update_return_request(request_id: str, status: str, admin: dict = Depe
     })
     
     if status == "approved":
-        # Remove user from asset
         await db.assets.update_one({"id": rr["asset_id"]}, {
             "$pull": {"assigned_user_ids": rr["user_id"]},
             "$set": {"status": "unassigned", "updated_at": now}
@@ -1269,7 +1292,7 @@ async def root():
 
 @api_router.post("/init")
 async def initialize_database():
-    """Initialize database with default admin and sample users"""
+    """Initialize database with admin and real users"""
     # Check if already initialized
     existing_admin = await db.users.find_one({"email": "admin@ideal.iitk.ac.in"})
     if existing_admin:
@@ -1278,63 +1301,134 @@ async def initialize_database():
     now = datetime.now(timezone.utc).isoformat()
     
     # Create admin
+    admin_id = str(uuid.uuid4())
     admin = {
-        "id": str(uuid.uuid4()),
+        "id": admin_id,
         "name": "Lab Administrator",
         "email": "admin@ideal.iitk.ac.in",
         "roll_no": "ADMIN001",
         "programme": "Administration",
+        "phone": None,
         "password": hash_password("admin"),
         "role": "admin",
         "initial_role": "admin",
         "is_flagged": False,
         "is_blacklisted": False,
         "is_active": True,
+        "profile_photo": None,
         "created_at": now,
         "updated_at": now
     }
     await db.users.insert_one(admin)
     
-    # Create 4 sample users
-    sample_users = [
-        {"name": "Rahul Sharma", "email": "rahul@iitk.ac.in", "roll_no": "210001", "programme": "BTech CSE"},
-        {"name": "Priya Singh", "email": "priya@iitk.ac.in", "roll_no": "210002", "programme": "MTech EE"},
-        {"name": "Amit Kumar", "email": "amit@iitk.ac.in", "roll_no": "210003", "programme": "PhD Physics"},
-        {"name": "Sneha Patel", "email": "sneha@iitk.ac.in", "roll_no": "210004", "programme": "BTech ME"}
+    # Real users data
+    real_users = [
+        {
+            "name": "Richik Majumder",
+            "email": "richik24@iitk.ac.in",
+            "roll_no": "241040068",
+            "programme": "MTech EE Y24",
+            "phone": "9433421164",
+            "personal_assets": ["chair", "cubicle", "monitor", "cpu", "mouse", "keyboard", "ups", "wifi_adapter"],
+        },
+        {
+            "name": "Pankaj Kumar Barman",
+            "email": "pankajb24@iitk.ac.in",
+            "roll_no": "MSR-EE-Y24",
+            "programme": "MSR EE Y24",
+            "phone": "9153254648",
+            "personal_assets": ["chair", "cubicle", "monitor", "cpu", "mouse", "keyboard", "ups", "hdmi_cable", "book", "book"],
+        },
+        {
+            "name": "Sunil Patel",
+            "email": "sunilp24@iitk.ac.in",
+            "roll_no": "PhD-EE-Y24",
+            "programme": "PhD EE Y24",
+            "phone": "7291887046",
+            "personal_assets": ["chair", "cubicle", "monitor", "cpu", "mouse", "keyboard", "ups", "adapter"],
+        },
+        {
+            "name": "Anshu Pal",
+            "email": "panshu25@iitk.ac.in",
+            "roll_no": "MTech-EE-Y25",
+            "programme": "MTech EE Y25",
+            "phone": "8318564224",
+            "personal_assets": ["chair", "cubicle", "monitor", "cpu", "mouse", "keyboard", "ups", "adapter"],
+        },
+        {
+            "name": "Test User",
+            "email": "test@iitk.ac.in",
+            "roll_no": "TEST001",
+            "programme": "Test",
+            "phone": None,
+            "personal_assets": ["cubicle"],
+        },
     ]
     
-    for user_data in sample_users:
+    user_ids = []
+    
+    for user_data in real_users:
         user_id = str(uuid.uuid4())
+        user_ids.append(user_id)
         user = {
             "id": user_id,
             "name": user_data["name"],
             "email": user_data["email"],
             "roll_no": user_data["roll_no"],
             "programme": user_data["programme"],
+            "phone": user_data["phone"],
             "password": hash_password("password123"),
             "role": "user",
             "initial_role": "user",
             "is_flagged": False,
             "is_blacklisted": False,
             "is_active": True,
+            "profile_photo": None,
             "created_at": now,
             "updated_at": now
         }
         await db.users.insert_one(user)
         
-        # Create default assets
-        default_types = ["cubicle", "monitor", "keyboard", "chair", "cpu", "mouse"]
-        for asset_type in default_types:
+        # Create personal assets
+        book_count = 0
+        for asset_type in user_data["personal_assets"]:
             asset_id = await generate_asset_id(asset_type)
+            custom_asset_id = generate_custom_asset_id(asset_type)
+            
+            name = f"{asset_type.replace('_', ' ').title()} - {user_data['name']}"
+            if asset_type == "book":
+                book_count += 1
+                name = f"Book {book_count} - {user_data['name']}"
+                if book_count == 2 and user_data["name"] == "Pankaj Kumar Barman":
+                    # Book2 is coming shortly
+                    asset = {
+                        "id": str(uuid.uuid4()),
+                        "asset_id": asset_id,
+                        "custom_asset_id": custom_asset_id,
+                        "asset_type": asset_type,
+                        "name": name,
+                        "description": "Coming shortly",
+                        "status": "coming_soon",
+                        "is_shared": False,
+                        "is_returnable": True,
+                        "assigned_user_ids": [user_id],
+                        "created_at": now,
+                        "updated_at": now,
+                        "version": 1
+                    }
+                    await db.assets.insert_one(asset)
+                    continue
+            
             asset = {
                 "id": str(uuid.uuid4()),
                 "asset_id": asset_id,
+                "custom_asset_id": custom_asset_id,
                 "asset_type": asset_type,
-                "name": f"{asset_type.capitalize()} - {user_data['name']}",
-                "description": f"Default {asset_type} assigned to {user_data['name']}",
+                "name": name,
+                "description": f"Personal {asset_type.replace('_', ' ')} assigned to {user_data['name']}",
                 "status": "active",
                 "is_shared": False,
-                "is_returnable": False,
+                "is_returnable": asset_type == "book",
                 "assigned_user_ids": [user_id],
                 "created_at": now,
                 "updated_at": now,
@@ -1342,26 +1436,43 @@ async def initialize_database():
             }
             await db.assets.insert_one(asset)
     
-    # Create a shared server
-    server_id = await generate_asset_id("server")
-    user_ids = [u["id"] async for u in db.users.find({"role": "user"}, {"_id": 0, "id": 1})]
-    server = {
-        "id": str(uuid.uuid4()),
-        "asset_id": server_id,
-        "asset_type": "server",
-        "name": "Lab Server 1",
-        "description": "Main computational server for the lab",
-        "status": "active",
-        "is_shared": True,
-        "is_returnable": False,
-        "assigned_user_ids": user_ids,
-        "created_at": now,
-        "updated_at": now,
-        "version": 1
-    }
-    await db.assets.insert_one(server)
+    # Get user IDs excluding test user for shared assets
+    shared_user_ids = user_ids[:-1]  # All except test user
     
-    return {"message": "Database initialized with admin and 4 sample users"}
+    # Create shared assets
+    shared_assets = [
+        {"type": "printer", "name": "Lab Printer + LAN Cable", "description": "Shared printer with LAN cable"},
+        {"type": "locker", "name": "Lab Locker", "description": "Shared locker"},
+        {"type": "whiteboard", "name": "Lab Whiteboard", "description": "Shared whiteboard"},
+        {"type": "server", "name": "Lab Server", "description": "Shared computational server"},
+        {"type": "extension", "name": "Extension Board", "description": "Shared extension board"},
+    ]
+    
+    for shared in shared_assets:
+        asset_id = await generate_asset_id(shared["type"])
+        custom_asset_id = generate_custom_asset_id(shared["type"])
+        
+        # Server is "coming_soon", others are active
+        status = "coming_soon" if shared["type"] == "server" and "yet to arrive" in shared.get("description", "").lower() else "active"
+        
+        asset = {
+            "id": str(uuid.uuid4()),
+            "asset_id": asset_id,
+            "custom_asset_id": custom_asset_id,
+            "asset_type": shared["type"],
+            "name": shared["name"],
+            "description": shared["description"],
+            "status": "active",
+            "is_shared": True,
+            "is_returnable": False,
+            "assigned_user_ids": shared_user_ids,  # All users except test user
+            "created_at": now,
+            "updated_at": now,
+            "version": 1
+        }
+        await db.assets.insert_one(asset)
+    
+    return {"message": "Database initialized with admin and 5 users (4 real + 1 test)"}
 
 # Include the router in the main app
 app.include_router(api_router)
