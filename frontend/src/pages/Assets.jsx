@@ -250,21 +250,37 @@ const Assets = () => {
     setFormData({
       name: asset.name,
       description: asset.description || '',
+      custom_asset_id: asset.custom_asset_id || '',
       is_shared: asset.is_shared,
       is_returnable: asset.is_returnable,
       status: asset.status,
+      assigned_user_ids: asset.assigned_user_ids || [],
     });
     setIsEditOpen(true);
+  };
+
+  const openBulkAssignDialog = (asset) => {
+    setBulkAssignData({
+      asset_id: asset.id,
+      user_ids: asset.assigned_user_ids || [],
+    });
+    setSelectedAsset(asset);
+    setIsBulkAssignOpen(true);
   };
 
   const filteredAssets = assets.filter(asset => {
     const matchesSearch = 
       asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.asset_id.toLowerCase().includes(searchTerm.toLowerCase());
+      asset.asset_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (asset.custom_asset_id && asset.custom_asset_id.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesType = filterType === 'all' || asset.asset_type === filterType;
     const matchesStatus = filterStatus === 'all' || asset.status === filterStatus;
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  const getAllUsers = () => {
+    return users;
+  };
 
   const getUserName = (userId) => {
     const user = users.find(u => u.id === userId);
