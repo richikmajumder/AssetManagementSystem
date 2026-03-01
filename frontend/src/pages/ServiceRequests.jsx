@@ -85,6 +85,7 @@ const ServiceRequests = () => {
     description: '',
     is_generic: false,
     remarks: '',
+    images: [],
   });
 
   const [assetRequestForm, setAssetRequestForm] = useState({
@@ -94,6 +95,36 @@ const ServiceRequests = () => {
   });
 
   const [actionRemarks, setActionRemarks] = useState('');
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (formData.images.length + files.length > 4) {
+      toast.error('Maximum 4 images allowed');
+      return;
+    }
+
+    files.forEach(file => {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Only image files allowed');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, reader.result]
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
 
   const fetchData = async () => {
     try {
