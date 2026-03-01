@@ -1,34 +1,165 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* IDEAL Lab Inventory Management System - Custom Styles */
+
+/* Sidebar */
+.sidebar {
+  @apply fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 z-40;
+  transition: transform 0.3s ease-out;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+.sidebar-collapsed {
+  transform: translateX(-100%);
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+@media (max-width: 768px) {
+  .sidebar {
+    @apply w-72;
+  }
 }
 
-.App-link {
-    color: #61dafb;
+/* Main content */
+.main-content {
+  @apply ml-0 md:ml-64 min-h-screen;
+  transition: margin-left 0.3s ease-out;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.main-content-expanded {
+  @apply ml-0;
+}
+
+/* Dashboard grid */
+.dashboard-grid {
+  @apply grid gap-6;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* Stats card */
+.stats-card {
+  @apply p-6 rounded-xl bg-white border border-slate-200 shadow-sm;
+  @apply hover:shadow-md hover:border-slate-300 transition-all duration-200;
+}
+
+.stats-card-accent {
+  @apply bg-gradient-to-br from-blue-600 to-blue-700 text-white border-0;
+}
+
+/* Table styles */
+.data-table {
+  @apply w-full text-sm;
+}
+
+.data-table th {
+  @apply px-4 py-3 text-left font-semibold text-slate-600 bg-slate-50 border-b border-slate-200;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.data-table td {
+  @apply px-4 py-3 border-b border-slate-100;
+}
+
+.data-table tbody tr {
+  @apply hover:bg-slate-50 transition-colors duration-150;
+}
+
+/* Asset ID styling */
+.asset-id {
+  font-family: 'JetBrains Mono', monospace;
+  @apply text-xs px-2 py-1 bg-slate-100 rounded font-medium text-slate-600;
+}
+
+/* Request ID styling */
+.request-id {
+  font-family: 'JetBrains Mono', monospace;
+  @apply text-xs font-bold text-blue-600;
+}
+
+/* Notification bell */
+.notification-bell {
+  @apply relative p-2 rounded-full hover:bg-slate-100 transition-colors duration-150;
+}
+
+.notification-badge {
+  @apply absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center;
+}
+
+/* Loading states */
+.loading-shimmer {
+  @apply animate-pulse bg-slate-200 rounded;
+}
+
+/* Form styling */
+.form-group {
+  @apply space-y-2;
+}
+
+.form-label {
+  @apply text-sm font-medium text-slate-700;
+}
+
+/* Mobile menu overlay */
+.mobile-overlay {
+  @apply fixed inset-0 bg-black/50 z-30 md:hidden;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Empty state */
+.empty-state {
+  @apply flex flex-col items-center justify-center py-12 text-center;
+}
+
+.empty-state-icon {
+  @apply w-16 h-16 text-slate-300 mb-4;
+}
+
+.empty-state-text {
+  @apply text-slate-500 text-sm;
+}
+
+/* Action buttons group */
+.action-buttons {
+  @apply flex items-center gap-2;
+}
+
+/* Tab navigation */
+.tab-nav {
+  @apply flex items-center gap-1 p-1 bg-slate-100 rounded-lg;
+}
+
+.tab-item {
+  @apply px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150;
+  @apply text-slate-600 hover:text-slate-900 hover:bg-white/50;
+}
+
+.tab-item-active {
+  @apply bg-white text-slate-900 shadow-sm;
+}
+
+/* Search input */
+.search-input {
+  @apply pl-10 h-11 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500;
+  @apply transition-colors duration-200;
+}
+
+/* Filter dropdown */
+.filter-dropdown {
+  @apply h-10 bg-white border-slate-200;
+}
+
+/* Modal/Dialog enhancements */
+.dialog-content {
+  @apply max-h-[85vh] overflow-y-auto;
+}
+
+/* Toast enhancements */
+[data-sonner-toaster] {
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+/* Print styles */
+@media print {
+  .sidebar, .no-print {
+    display: none !important;
+  }
+  .main-content {
+    margin-left: 0 !important;
+  }
 }
