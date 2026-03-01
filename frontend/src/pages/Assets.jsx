@@ -107,15 +107,24 @@ const Assets = () => {
     asset_type: '',
     name: '',
     description: '',
+    custom_asset_id: '',
     is_shared: false,
     is_returnable: false,
     assigned_user_ids: [],
+    status: 'unassigned',
   });
 
   const [assignData, setAssignData] = useState({
     user_id: '',
     asset_type: '',
   });
+
+  const [bulkAssignData, setBulkAssignData] = useState({
+    asset_id: '',
+    user_ids: [],
+  });
+
+  const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
 
   const fetchData = async () => {
     try {
