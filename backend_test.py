@@ -185,6 +185,19 @@ class IDEALLabAPITester:
         )
         if success:
             print(f"   Found {len(response)} assets")
+            # Check for custom asset IDs in XYZ/ABCD/EF format
+            custom_ids = [asset.get('custom_asset_id') for asset in response if asset.get('custom_asset_id')]
+            print(f"   Sample custom IDs: {custom_ids[:5]}")
+            
+            # Verify format XYZ/ABCD/EF 
+            valid_format_count = 0
+            for custom_id in custom_ids:
+                if custom_id and '/' in custom_id:
+                    parts = custom_id.split('/')
+                    if len(parts) == 3:
+                        valid_format_count += 1
+            
+            print(f"✅ {valid_format_count}/{len(custom_ids)} assets have proper custom ID format")
         return success
 
     def test_get_my_assets(self):
