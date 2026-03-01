@@ -479,33 +479,36 @@ const ServiceRequests = () => {
                           {formatDistanceToNow(new Date(request.created_at), { addSuffix: true })}
                         </TableCell>
                         <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" data-testid={`service-actions-${request.id}`}>
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {isAdminOrCoAdmin && request.status === 'pending' && (
-                                <>
-                                  <DropdownMenuItem onClick={() => handleUpdateServiceRequest(request.id, 'approved')}>
-                                    <Check className="w-4 h-4 mr-2 text-green-600" />
-                                    Approve
+                          {/* Hide actions for resolved requests */}
+                          {request.status !== 'resolved' && request.status !== 'rejected' && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" data-testid={`service-actions-${request.id}`}>
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {isAdminOrCoAdmin && request.status === 'pending' && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleUpdateServiceRequest(request.id, 'approved')}>
+                                      <Check className="w-4 h-4 mr-2 text-green-600" />
+                                      Approve
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateServiceRequest(request.id, 'rejected')}>
+                                      <X className="w-4 h-4 mr-2 text-red-600" />
+                                      Reject
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                {(request.status === 'approved' || request.status === 'work_in_progress') && (
+                                  <DropdownMenuItem onClick={() => handleResolveRequest(request.id)}>
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Mark Resolved
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleUpdateServiceRequest(request.id, 'rejected')}>
-                                    <X className="w-4 h-4 mr-2 text-red-600" />
-                                    Reject
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              {(request.status === 'approved' || request.status === 'work_in_progress') && (
-                                <DropdownMenuItem onClick={() => handleResolveRequest(request.id)}>
-                                  <CheckCircle className="w-4 h-4 mr-2" />
-                                  Mark Resolved
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
