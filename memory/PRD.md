@@ -3,13 +3,13 @@
 ## Original Problem Statement
 Build a comprehensive lab inventory management system for IDEAL Lab at IIT Kanpur with:
 - Admin, Co-Admin, and User roles with granular permissions
-- Asset management with auto-generated IDs
-- Service request system with 7-day cooldown on rejections
+- Asset management with auto-generated IDs in XYZ/ABCD/EF format
+- Service request system with image upload (max 4) and 7-day cooldown on rejections
 - Consumables/Stationery ordering with reimbursement
-- Shared assets (servers) and returnable assets (books)
-- User flagging, blacklisting, deactivation
+- Shared assets with selective user assignment
+- User profile photo upload and password change
 - Activity logs and notifications
-- Transaction locking for concurrent operations
+- Landing page with typewriter effect
 
 ## User Personas
 1. **Admin** - Full control over users, assets, requests, and logs
@@ -20,83 +20,77 @@ Build a comprehensive lab inventory management system for IDEAL Lab at IIT Kanpu
 - JWT-based authentication
 - MongoDB database
 - Role-based access control (RBAC)
-- Auto-generated asset IDs (e.g., MON-2026001)
+- Custom asset IDs in XYZ/ABCD/EF format (e.g., CMP/A1B2/XY)
 - Default assets assigned on user creation
-- Service request workflow with status transitions
-- Consumable orders with reimbursement option
-- Activity logging for audit trail
-- Bell notifications
+- Service request workflow with image attachments
+- Profile photo upload for all users
+- Password change for all users
 
-## What's Been Implemented (v1.0 - March 1, 2026)
+## What's Been Implemented (v1.1 - March 1, 2026)
 
 ### Backend (FastAPI)
 - [x] JWT authentication with login/logout
-- [x] User CRUD with role management
-- [x] User flagging, blacklisting, deactivation
-- [x] Password change (admin only)
-- [x] Asset CRUD with auto-generated IDs
-- [x] Asset assignment (auto-assign available or create new)
-- [x] Shared assets support
-- [x] Returnable assets (books) with return requests
-- [x] Service requests with approval workflow
+- [x] Password change for all users (self + admin)
+- [x] Profile photo upload
+- [x] User CRUD with role management and phone number
+- [x] Asset CRUD with custom IDs (XYZ/ABCD/EF format)
+- [x] Bulk asset assignment for shared assets
+- [x] Service requests with image upload (max 4)
 - [x] 7-day cooldown on rejected requests
-- [x] Asset requests for new items
-- [x] Consumable orders (admin order & reimbursement)
-- [x] Direct consumable addition by admin
+- [x] Consumable orders with reimbursement
 - [x] Activity logs for all actions
 - [x] Notifications system
-- [x] Dashboard statistics
 
 ### Frontend (React + Tailwind + Shadcn)
-- [x] Login page with lab background
+- [x] Landing page with typewriter effect and logo
+- [x] Login page with dark theme and gold accents
 - [x] Admin Dashboard with stats and charts
 - [x] User Dashboard with asset overview
-- [x] Users management page (CRUD, flag, blacklist)
-- [x] Assets management page (CRUD, assign, filter)
-- [x] Service Requests page (create, approve, reject)
-- [x] Consumables page (order, reimburse, direct add)
-- [x] My Assets page for users
-- [x] Activity Logs page (admin only)
+- [x] Profile page with photo upload and password change
+- [x] Assets page with custom_asset_id column
+- [x] Service Requests with image upload (max 4)
+- [x] Resolved requests hide action buttons (3 dots)
 - [x] Bell notifications with dropdown
 - [x] Responsive design (mobile, tablet, desktop)
 
 ### Data Initialized
-- 1 Admin (admin@ideal.iitk.ac.in / admin)
-- 4 Sample Users with default assets
-- 1 Shared Lab Server
+**Admin:**
+- admin@ideal.iitk.ac.in / admin
 
-## Prioritized Backlog
+**Real Users (password123):**
+1. Richik Majumder (richik24@iitk.ac.in) - MTech EE Y24, Roll: 241040068
+2. Pankaj Kumar Barman (pankajb24@iitk.ac.in) - MSR EE Y24
+3. Sunil Patel (sunilp24@iitk.ac.in) - PhD EE Y24
+4. Anshu Pal (panshu25@iitk.ac.in) - MTech EE Y25
+5. Test User (test@iitk.ac.in) - Only cubicle assigned
 
-### P0 (Critical) - Completed
-- [x] Authentication system
-- [x] User management
-- [x] Asset management
-- [x] Service requests
-- [x] Dashboard views
+**Shared Assets:**
+- Lab Printer + LAN Cable
+- Lab Locker
+- Lab Whiteboard
+- Lab Server
+- Extension Board
 
-### P1 (High Priority) - Future
-- [ ] Image upload for service requests
-- [ ] PDF invoice download for reimbursements
-- [ ] Email notifications integration
-- [ ] Bulk asset import/export
-
-### P2 (Medium Priority) - Future
-- [ ] Dark mode toggle
-- [ ] Asset QR code generation
-- [ ] Advanced reporting/analytics
-- [ ] Asset depreciation tracking
-
-### P3 (Nice to Have) - Future
-- [ ] Mobile app (React Native)
-- [ ] Barcode scanner integration
-- [ ] Calendar view for maintenance schedules
+## Asset Categories and ID Prefixes
+- FRN: Furniture (Chair, Cubicle)
+- CMP: Computer Equipment (Monitor, CPU, Mouse, Keyboard)
+- PWR: Power Equipment (UPS, Extension)
+- ACC: Accessories (Adapter)
+- NET: Network Equipment (WiFi Adapter)
+- CBL: Cables (HDMI, LAN)
+- PRN: Printer
+- SRV: Server
+- STR: Storage (Locker, Pen Drive, HDD)
+- OFC: Office Equipment (Whiteboard)
+- BK: Books
+- MSC: Miscellaneous
 
 ## Next Tasks
-1. Add image upload support for service requests
-2. Implement email notification integration
-3. Add bulk asset import via CSV
-4. Implement advanced filtering and search
-5. Add export to PDF/Excel functionality
+1. Email notification integration
+2. Bulk asset import via CSV
+3. Advanced reporting/analytics
+4. Asset QR code generation
+5. Mobile app (React Native)
 
 ## Technical Architecture
 ```
@@ -108,6 +102,6 @@ Frontend (React) -> FastAPI Backend -> MongoDB
   React Router       Bcrypt Hashing
 ```
 
-## Credentials
+## Credentials Summary
 - **Admin**: admin@ideal.iitk.ac.in / admin
-- **Users**: rahul@iitk.ac.in, priya@iitk.ac.in, amit@iitk.ac.in, sneha@iitk.ac.in / password123
+- **All Users**: password123
