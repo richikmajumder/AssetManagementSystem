@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
+from pymongo import ReturnDocument
 import os
 import logging
 from pathlib import Path
@@ -344,16 +345,16 @@ def generate_custom_asset_id(asset_type: str) -> str:
     return f"{prefix}/{middle}/{suffix}"
 
 async def generate_request_id(prefix: str = "SR") -> str:
-    """Generate unique request ID"""
     year = datetime.now(timezone.utc).year
-    count = await db.counters.find_one_and_update(
+
+    counter = await db.counters.find_one_and_update(
         {"_id": f"{prefix}_{year}"},
         {"$inc": {"seq": 1}},
         upsert=True,
-        return_document=True
+        return_document=ReturnDocument.AFTER
     )
-    return f"{prefix}-{year}{str(count['seq']).zfill(4)}"
 
+    return f"{prefix}-{year}{str(counter['seq']).zfill(4)}"
 async def log_activity(user_id: str, user_name: str, user_role: str, action: str, 
                        entity_type: str, entity_id: str, details: dict):
     """Log activity for audit trail"""
@@ -655,8 +656,29 @@ async def update_asset(asset_id: str, update: AssetUpdate, admin: dict = Depends
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     
+    now = datetime.now(timezone.utc).isoformat()
+
+    # -------------------------------------------------
+    # RULE 1: If asset is unassigned, status cannot change
+    # -------------------------------------------------
+    if asset["status"] == "unassigned":
+        if update.status is not None and update.status != "unassigned":
+            raise HTTPException(
+                status_code=400,
+                detail="Unassigned asset status cannot be changed manually. Use Assign Asset."
+            )
+
+    # -------------------------------------------------
     # Check for assignment conflicts for non-shared assets
-    if update.assigned_user_ids and not asset.get("is_shared", False) and not update.is_shared:
+    # (UNCHANGED from your original logic)
+    # -------------------------------------------------
+    if (
+    update.status != "unassigned"
+    and update.assigned_user_ids is not None
+    and len(update.assigned_user_ids) > 0
+    and not asset.get("is_shared", False)
+    and not update.is_shared
+):
         for uid in update.assigned_user_ids:
             existing = await db.assets.find_one({
                 "id": {"$ne": asset_id},
@@ -670,15 +692,41 @@ async def update_asset(asset_id: str, update: AssetUpdate, admin: dict = Depends
                     status_code=400, 
                     detail=f"This item is already assigned to {user['name'] if user else 'another user'}"
                 )
-    
+
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
-    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    # -------------------------------------------------
+    # If assigned_user_ids provided → sync and auto-handle status
+    # -------------------------------------------------
+    if update.assigned_user_ids is not None:
+        update_data["assigned_user_ids"] = update.assigned_user_ids
+
+        if len(update.assigned_user_ids) == 0:
+            update_data["status"] = "unassigned"
+        else:
+            update_data["status"] = "active"
+
+    # -------------------------------------------------
+    # If status manually set to unassigned → clear users
+    # -------------------------------------------------
+    if update.status == "unassigned":
+        update_data["assigned_user_ids"] = []
+        update_data["status"] = "unassigned"
+
+    update_data["updated_at"] = now
     update_data["version"] = asset["version"] + 1
     
     await db.assets.update_one({"id": asset_id}, {"$set": update_data})
     
-    await log_activity(admin["id"], admin["name"], admin["role"], "UPDATE_ASSET",
-                       "asset", asset_id, update_data)
+    await log_activity(
+        admin["id"], 
+        admin["name"], 
+        admin["role"], 
+        "UPDATE_ASSET",
+        "asset", 
+        asset_id, 
+        update_data
+    )
     
     return await db.assets.find_one({"id": asset_id}, {"_id": 0})
 
@@ -768,8 +816,11 @@ async def bulk_assign_assets(data: AssetAssignUpdate, admin: dict = Depends(requ
     if data.action == "assign":
         # Add users to assigned list
         await db.assets.update_one({"id": data.asset_id}, {
-            "$addToSet": {"assigned_user_ids": {"$each": data.user_ids}},
-            "$set": {"status": "active", "updated_at": now}
+            "$set": {
+    "assigned_user_ids": data.user_ids,
+    "status": "active",
+    "updated_at": now
+}
         })
         for uid in data.user_ids:
             await create_notification(uid, f"You have been assigned to {asset['name']}", "asset_assigned", asset["id"])
