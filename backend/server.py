@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from contextlib import asynccontextmanager
 import os
 import logging
 from pathlib import Path
@@ -20,18 +21,29 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+mongo_url = os.environ.get("MONGO_URL")
+if not mongo_url:
+    raise Exception("MONGO_URL not found in environment variables")
 
+client = AsyncIOMotorClient(mongo_url)
+db = client["IDEAL_LAB"]
 # JWT Configuration
-JWT_SECRET = os.environ.get('JWT_SECRET', 'ideal-lab-secret-key-change-in-production')
+JWT_SECRET = "RandomVariableSuperMartingle"
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
 # Create the main app
-app = FastAPI(title="IDEAL Lab Inventory Management System")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic (if needed)
+    yield
+    # Shutdown logic
+    client.close()
 
+app = FastAPI(
+    title="IDEAL Lab Inventory Management System",
+    lifespan=lifespan
+)
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
@@ -1485,6 +1497,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
